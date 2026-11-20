@@ -4,10 +4,12 @@
 -- Webapp: https://chamthi-gules.vercel.app/
 -- ==============================================================================
 
--- 1. CẬP NHẬT CỘT CHO BẢNG TEAMS (ĐỒNG BỘ THỨ TỰ BIỂU DIỄN)
+-- 1. CẬP NHẬT CỘT VÀ RÀNG BUỘC CHO BẢNG TEAMS (ĐỒNG BỘ THỨ TỰ BIỂU DIỄN & NGÔI SAO MAY MẮN)
 ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS performance_order INTEGER;
 UPDATE public.teams SET performance_order = display_order WHERE performance_order IS NULL;
 ALTER TABLE public.teams ALTER COLUMN display_order DROP NOT NULL;
+ALTER TABLE public.teams DROP CONSTRAINT IF EXISTS teams_lucky_star_check;
+ALTER TABLE public.teams ADD CONSTRAINT teams_lucky_star_check CHECK (lucky_star IN (-5, 0, 5));
 
 -- 2. CẬP NHẬT CỘT CHO BẢNG PARTICIPANTS (KHOA PHÒNG & BỎ KHÓA AUTH)
 ALTER TABLE public.participants ADD COLUMN IF NOT EXISTS department VARCHAR(255) DEFAULT 'Chưa phân khoa';
