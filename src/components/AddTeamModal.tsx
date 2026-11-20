@@ -60,6 +60,7 @@ export const AddTeamModal: React.FC<AddTeamModalProps> = ({
       const { error } = await supabase.from('teams').insert({
         name: cleanName,
         performance_order: order,
+        display_order: order,
         video_url: videoUrl.trim() || null,
         teammate_bonus: 0,
         lucky_star: 0,

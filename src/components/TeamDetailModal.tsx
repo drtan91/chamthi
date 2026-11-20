@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TeamBoardItem } from '../types';
-import { supabase, isMockMode } from '../lib/supabase';
+import { supabase, isMockMode, getYouTubeEmbedUrl } from '../lib/supabase';
 import { mockStore } from '../lib/mockData';
 import { X, Upload, Trash2, Video, AlertCircle, CheckCircle, Link2, Film, Edit3 } from 'lucide-react';
 
@@ -137,7 +137,13 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
       setSuccessMessage('Đã cập nhật video mới');
       onUpdated();
     } catch (err: any) {
-      setErrorMessage(err.message || 'Lỗi khi upload video');
+      const msg = err.message || '';
+      if (msg.includes('Bucket') || msg.includes('bucket') || msg.includes('not found')) {
+        setErrorMessage('Chưa tạo bucket "team-videos" trên Supabase. Anh/chị hãy bấm "Dán link URL" phía trên để dán trực tiếp link video (YouTube/MP4) rất nhanh và tiện!');
+        setShowUrlInput(true);
+      } else {
+        setErrorMessage(msg || 'Lỗi khi upload video');
+      }
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -252,6 +258,7 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
         .update({
           name: cleanName,
           performance_order: Number(teamOrder),
+          display_order: Number(teamOrder),
           teammate_bonus: teammateBonus,
           lucky_star: luckyStar,
           updated_at: new Date().toISOString(),
@@ -415,14 +422,24 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
             {currentVideoUrl ? (
               <div className="space-y-2">
                 <div className="rounded border border-slate-200 bg-slate-900 aspect-video flex items-center justify-center overflow-hidden">
-                  <video
-                    key={currentVideoUrl}
-                    src={currentVideoUrl}
-                    controls
-                    playsInline
-                    preload="metadata"
-                    className="w-full h-full object-contain"
-                  />
+                  {getYouTubeEmbedUrl(currentVideoUrl) ? (
+                    <iframe
+                      src={getYouTubeEmbedUrl(currentVideoUrl)!}
+                      title="YouTube Video Player"
+                      className="w-full h-full aspect-video border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video
+                      key={currentVideoUrl}
+                      src={currentVideoUrl}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="w-full h-full object-contain"
+                    />
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button

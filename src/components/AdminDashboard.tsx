@@ -61,50 +61,58 @@ export const AdminDashboard: React.FC = () => {
         .single();
       if (setts) setSettings(setts as SystemSettings);
 
-      // 2. Fetch team board via RPC or direct join
-      const { data: boardData, error: boardError } = await supabase.rpc('get_team_board');
+      // 2. Fetch teams directly with unified mapping identical to ParticipantView
+      let teamsData: any[] | null = null;
+      const { data: res1, error: err1 } = await supabase
+        .from('teams')
+        .select('*')
+        .order('performance_order', { ascending: true })
+        .order('name', { ascending: true });
 
-      if (!boardError && boardData) {
-        setTeams(boardData);
+      if (!err1 && res1 && res1.length > 0) {
+        teamsData = res1;
       } else {
-        const { data: teamsData } = await supabase
-          .from('teams')
-          .select('*')
-          .order('performance_order', { ascending: true })
-          .order('name', { ascending: true })
-          .order('id', { ascending: true });
-
-        const { data: votesData } = await supabase.from('votes').select('team_id, vocal_score, performance_score');
-
-        if (teamsData) {
-          const mapped: TeamBoardItem[] = teamsData.map((t) => {
-            const teamVotes = (votesData || []).filter((v) => v.team_id === t.id);
-            const count = teamVotes.length;
-            const avg =
-              count > 0
-                ? Number(
-                    (
-                      teamVotes.reduce((sum, v) => sum + (v.vocal_score + v.performance_score) / 2, 0) /
-                      count
-                    ).toFixed(2)
-                  )
-                : 0;
-
-            return {
-              id: t.id,
-              name: t.name,
-              performance_order: t.performance_order,
-              video_url: t.video_url,
-              video_storage_path: t.video_storage_path,
-              audience_score: avg,
-              vote_count: count,
-              teammate_bonus: t.teammate_bonus,
-              lucky_star: t.lucky_star,
-            };
-          });
-          setTeams(mapped);
+        const { data: res2 } = await supabase.from('teams').select('*');
+        if (res2 && res2.length > 0) {
+          teamsData = res2;
         }
       }
+
+      if (!teamsData || teamsData.length === 0) {
+        teamsData = mockStore.getTeams();
+      }
+
+      const { data: votesData } = await supabase.from('votes').select('team_id, vocal_score, performance_score');
+
+      const mapped: TeamBoardItem[] = teamsData.map((t) => {
+        const teamId = t.id || t.team_id;
+        const teamVotes = (votesData || []).filter((v) => v.team_id === teamId);
+        const count = teamVotes.length;
+        const avg =
+          count > 0
+            ? Number(
+                (
+                  teamVotes.reduce((sum, v) => sum + (v.vocal_score + v.performance_score) / 2, 0) /
+                  count
+                ).toFixed(2)
+              )
+            : 0;
+
+        return {
+          id: teamId,
+          name: t.name || t.team_name,
+          performance_order: Number(t.performance_order ?? t.display_order ?? 1),
+          video_url: t.video_url || null,
+          video_storage_path: t.video_storage_path || null,
+          audience_score: avg,
+          vote_count: count,
+          teammate_bonus: Number(t.teammate_bonus ?? 0),
+          lucky_star: Number(t.lucky_star ?? 0),
+        };
+      });
+
+      mapped.sort((a, b) => a.performance_order - b.performance_order);
+      setTeams(mapped);
 
       // 3. Fetch participants list for management tab
       let loadedParts: Participant[] = [];

@@ -4,6 +4,21 @@ import { mockStore } from './mockData';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://dummy-project.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'dummy-anon-key';
 
+/**
+ * Utility to extract YouTube Embed URL if given a YouTube watch/shorts/youtu.be link.
+ */
+export function getYouTubeEmbedUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  const ytMatch = trimmed.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+  );
+  if (ytMatch && ytMatch[1]) {
+    return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  }
+  return null;
+}
+
 export const isMockMode =
   !supabaseUrl ||
   supabaseUrl.includes('dummy') ||

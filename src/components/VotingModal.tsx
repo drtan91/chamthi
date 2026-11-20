@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TeamBoardItem } from '../types';
-import { submitVote } from '../lib/supabase';
+import { submitVote, getYouTubeEmbedUrl } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { X, Play, Lock, AlertCircle, CheckCircle } from 'lucide-react';
 
@@ -119,14 +119,24 @@ export const VotingModal: React.FC<VotingModalProps> = ({
           {/* Video Section */}
           <div className="rounded border border-slate-200 bg-slate-900 aspect-video flex items-center justify-center overflow-hidden">
             {hasVideo ? (
-              <video
-                key={team.video_url || 'has-vid'}
-                src={team.video_url!}
-                controls
-                playsInline
-                preload="metadata"
-                className="w-full h-full object-contain"
-              />
+              getYouTubeEmbedUrl(team.video_url) ? (
+                <iframe
+                  src={getYouTubeEmbedUrl(team.video_url)!}
+                  title="Video Trình Diễn"
+                  className="w-full h-full aspect-video border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <video
+                  key={team.video_url || 'has-vid'}
+                  src={team.video_url!}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-full object-contain"
+                />
+              )
             ) : (
               <div className="text-center p-4 font-mono text-xs text-slate-400">
                 <Play className="w-6 h-6 mx-auto mb-1 text-slate-500" />
