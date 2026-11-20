@@ -113,10 +113,18 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
         cleanupJobId = jobData?.id ?? null;
       }
 
-      const { error: dbError } = await supabase
+      let { error: dbError } = await supabase
         .from('teams')
         .update({ video_url: newVideoUrl, video_storage_path: storagePath, updated_at: new Date().toISOString() })
         .eq('id', team.id);
+
+      if (dbError && dbError.message.includes('video_storage_path')) {
+        const fallbackRes = await supabase
+          .from('teams')
+          .update({ video_url: newVideoUrl, updated_at: new Date().toISOString() })
+          .eq('id', team.id);
+        dbError = fallbackRes.error;
+      }
 
       if (dbError) {
         await supabase.storage.from('team-videos').remove([storagePath]);
@@ -207,10 +215,18 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
 
     try {
       const oldStoragePath = team.video_storage_path;
-      const { error: dbError } = await supabase
+      let { error: dbError } = await supabase
         .from('teams')
         .update({ video_url: null, video_storage_path: null, updated_at: new Date().toISOString() })
         .eq('id', team.id);
+
+      if (dbError && dbError.message.includes('video_storage_path')) {
+        const fallbackRes = await supabase
+          .from('teams')
+          .update({ video_url: null, updated_at: new Date().toISOString() })
+          .eq('id', team.id);
+        dbError = fallbackRes.error;
+      }
 
       if (dbError) throw dbError;
 
