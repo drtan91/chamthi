@@ -202,7 +202,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   type="password"
                   autoFocus
                   required
-                  placeholder="Nhập pass: 855986"
+                  placeholder="Nhập pass: 85586"
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
                   className="oat-input font-mono text-sm tracking-wider font-bold"
