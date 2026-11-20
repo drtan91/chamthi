@@ -147,11 +147,28 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
         onUpdated();
         return;
       }
+
+      // Try RPC admin_delete_vote first (SECURITY DEFINER – bypasses RLS)
+      const { error: rpcErr } = await supabase.rpc('admin_delete_vote', {
+        p_vote_id: voter.vote_id,
+      });
+
+      if (!rpcErr) {
+        // RPC succeeded
+        setVoters((prev) => prev.filter((v) => v.vote_id !== voter.vote_id));
+        onUpdated();
+        setSuccessMessage(`Đã xóa phiếu chấm của "${voter.participant_name}"`);
+        setTimeout(() => setSuccessMessage(null), 3000);
+        return;
+      }
+
+      // Fallback: direct delete (works if RLS allows)
       const { error } = await supabase
         .from('votes')
         .delete()
         .eq('id', voter.vote_id);
       if (error) throw error;
+
       setVoters((prev) => prev.filter((v) => v.vote_id !== voter.vote_id));
       onUpdated();
       setSuccessMessage(`Đã xóa phiếu chấm của "${voter.participant_name}"`);
