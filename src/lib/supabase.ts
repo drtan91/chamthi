@@ -19,6 +19,21 @@ export function getYouTubeEmbedUrl(url: string | null | undefined): string | nul
   return null;
 }
 
+/**
+ * Convert legacy ID like 'emp-3' to standard Supabase UUID 'e0000000-0000-0000-0000-000000000003'.
+ */
+export function normalizeParticipantId(id: string | null | undefined): string | null {
+  if (!id) return null;
+  const trimmed = id.trim();
+  if (trimmed.startsWith('emp-')) {
+    const num = parseInt(trimmed.replace('emp-', ''), 10);
+    if (!isNaN(num)) {
+      return 'e0000000-0000-0000-0000-' + String(num).padStart(12, '0');
+    }
+  }
+  return trimmed;
+}
+
 export const isMockMode =
   !supabaseUrl ||
   supabaseUrl.includes('dummy') ||
@@ -51,7 +66,7 @@ export async function submitVote(
   performanceScore: number,
   participantId?: string
 ): Promise<SubmitVoteResult> {
-  const currentPartId =
+  const rawPartId =
     participantId ||
     localStorage.getItem('mock_participant_id') ||
     (() => {
@@ -62,6 +77,8 @@ export async function submitVote(
         return undefined;
       }
     })();
+
+  const currentPartId = normalizeParticipantId(rawPartId);
 
   if (isMockMode) {
     return mockStore.submitVote(currentPartId || 'p-1', teamId, vocalScore, performanceScore);

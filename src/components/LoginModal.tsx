@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { mockStore, removeDiacritics } from '../lib/mockData';
+import { supabase, isMockMode, normalizeParticipantId } from '../lib/supabase';
 import { Participant } from '../types';
 import { X, Search, Check, Building2, User, AlertCircle, ShieldAlert, Lock, ShieldCheck } from 'lucide-react';
 
@@ -23,10 +24,47 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Get full list of participants from store
-  const allParticipants = useMemo(() => {
-    return mockStore.getParticipants().filter((p) => p.is_active);
+  const [dbParticipants, setDbParticipants] = useState<Participant[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchReal = async () => {
+      if (isMockMode) {
+        setDbParticipants(mockStore.getParticipants().filter((p) => p.is_active));
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('participants')
+        .select('id, username, name, department, is_active')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (mounted) {
+        if (!error && data && data.length > 0) {
+          setDbParticipants(data as Participant[]);
+        } else {
+          setDbParticipants(mockStore.getParticipants().filter((p) => p.is_active));
+        }
+      }
+    };
+
+    if (isOpen) {
+      fetchReal();
+    }
+    return () => {
+      mounted = false;
+    };
   }, [isOpen]);
+
+  // Get full list of participants from state or store
+  const allParticipants = useMemo(() => {
+    const list = dbParticipants.length > 0 ? dbParticipants : mockStore.getParticipants().filter((p) => p.is_active);
+    return list.map((p) => ({
+      ...p,
+      id: normalizeParticipantId(p.id) || p.id,
+    }));
+  }, [dbParticipants, isOpen]);
 
   // Filtered participants based on query
   const filteredParticipants = useMemo(() => {

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase, isMockMode } from '../lib/supabase';
+import { supabase, isMockMode, normalizeParticipantId } from '../lib/supabase';
 import { mockStore } from '../lib/mockData';
 import { Participant } from '../types';
 
@@ -94,6 +94,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const parsed = JSON.parse(savedParticipantStr);
         if (parsed && parsed.id) {
+          parsed.id = normalizeParticipantId(parsed.id);
+          localStorage.setItem('chamthi_participant_session', JSON.stringify(parsed));
+          localStorage.setItem('mock_participant_id', parsed.id);
           setParticipant(parsed);
           setUser({ id: parsed.id, email: `${parsed.username || 'user'}@hoithihat.local` } as User);
           setRole('participant');
@@ -249,12 +252,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Tài khoản nhân viên này đã bị vô hiệu hóa' };
       }
 
+      const normalized: Participant = {
+        ...selected,
+        id: normalizeParticipantId(selected.id) || selected.id,
+      };
+
       // Zero-password participant login: persists session in localStorage
-      localStorage.setItem('chamthi_participant_session', JSON.stringify(selected));
-      localStorage.setItem('mock_participant_id', selected.id);
+      localStorage.setItem('chamthi_participant_session', JSON.stringify(normalized));
+      localStorage.setItem('mock_participant_id', normalized.id);
       localStorage.setItem('mock_role', 'participant');
-      setParticipant(selected);
-      setUser({ id: selected.id, email: `${selected.username || 'user'}@hoithihat.local` } as User);
+      setParticipant(normalized);
+      setUser({ id: normalized.id, email: `${normalized.username || 'user'}@hoithihat.local` } as User);
       setRole('participant');
       return { success: true };
     } catch (err: any) {
