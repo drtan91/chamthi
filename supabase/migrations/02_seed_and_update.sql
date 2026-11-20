@@ -13,27 +13,11 @@ ALTER TABLE public.teams ALTER COLUMN display_order DROP NOT NULL;
 ALTER TABLE public.participants ADD COLUMN IF NOT EXISTS department VARCHAR(255) DEFAULT 'Chưa phân khoa';
 ALTER TABLE public.participants ALTER COLUMN auth_user_id DROP NOT NULL;
 
--- 3. CẬP NHẬT QUYỀN RLS (CHO PHÉP TRUY VẤN VÀ CHẤM ĐIỂM)
-ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS p_settings_public_select ON public.system_settings;
-CREATE POLICY p_settings_public_select ON public.system_settings FOR SELECT USING (true);
-DROP POLICY IF EXISTS p_settings_public_all ON public.system_settings;
-CREATE POLICY p_settings_public_all ON public.system_settings FOR ALL USING (true);
-
-ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS p_teams_public_select ON public.teams;
-CREATE POLICY p_teams_public_select ON public.teams FOR SELECT USING (true);
-DROP POLICY IF EXISTS p_teams_public_all ON public.teams FOR ALL USING (true);
-
-ALTER TABLE public.participants ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS p_parts_public_select ON public.participants;
-CREATE POLICY p_parts_public_select ON public.participants FOR SELECT USING (true);
-DROP POLICY IF EXISTS p_parts_public_all ON public.participants FOR ALL USING (true);
-
-ALTER TABLE public.votes ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS p_votes_public_select ON public.votes;
-CREATE POLICY p_votes_public_select ON public.votes FOR SELECT USING (true);
-DROP POLICY IF EXISTS p_votes_public_all ON public.votes FOR ALL USING (true);
+-- 3. CẬP NHẬT QUYỀN TRUY CẬP (MỞ QUYỀN ĐỌC GHI CHO APP CHẤM ĐIỂM)
+ALTER TABLE public.system_settings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.participants DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.votes DISABLE ROW LEVEL SECURITY;
 
 -- 4. NẠP DỮ LIỆU 5 ĐỘI THI BAN ĐẦU
 INSERT INTO public.teams (id, name, display_order, performance_order, video_url, teammate_bonus, lucky_star)
