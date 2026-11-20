@@ -1,8 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TeamBoardItem } from '../types';
 import { supabase, isMockMode, getYouTubeEmbedUrl } from '../lib/supabase';
 import { mockStore } from '../lib/mockData';
-import { X, Upload, Trash2, Video, AlertCircle, CheckCircle, Link2, Film, Edit3 } from 'lucide-react';
+import { X, Upload, Trash2, Video, AlertCircle, CheckCircle, Link2, Film, Edit3, Users, ChevronDown, ChevronUp } from 'lucide-react';
+
+interface VoterEntry {
+  vote_id: string;
+  participant_id: string;
+  participant_name: string;
+  department: string;
+  vocal_score: number;
+  performance_score: number;
+  voted_at: string;
+}
 
 interface TeamDetailModalProps {
   team: TeamBoardItem | null;
@@ -32,6 +42,13 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
   const [teammateBonus, setTeammateBonus] = useState<number>(team?.teammate_bonus ?? 0);
   const [luckyStar, setLuckyStar] = useState<number>(team?.lucky_star ?? 0);
 
+  // ── Voter list state ────────────────────────────────────────────────────────
+  const [voters, setVoters] = useState<VoterEntry[]>([]);
+  const [votersLoading, setVotersLoading] = useState(false);
+  const [votersOpen, setVotersOpen] = useState(false);
+  const [deletingVoteId, setDeletingVoteId] = useState<string | null>(null);
+  // ───────────────────────────────────────────────────────────────────────────
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -45,8 +62,106 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
       setErrorMessage(null);
       setSuccessMessage(null);
       setShowUrlInput(false);
+      // Reset voter list when team changes
+      setVoters([]);
+      setVotersOpen(false);
     }
   }, [team]);
+
+  // Load voter list for this team
+  const loadVoters = useCallback(async () => {
+    if (!team) return;
+    setVotersLoading(true);
+    try {
+      if (isMockMode) {
+        setVoters([]);
+        return;
+      }
+      // Fetch votes for this team
+      const { data: votesData, error: votesErr } = await supabase
+        .from('votes')
+        .select('id, participant_id, vocal_score, performance_score, updated_at, created_at')
+        .eq('team_id', team.id)
+        .order('updated_at', { ascending: false });
+
+      if (votesErr) throw votesErr;
+      if (!votesData || votesData.length === 0) {
+        setVoters([]);
+        return;
+      }
+
+      // Fetch participant details
+      const participantIds = votesData.map((v: any) => v.participant_id);
+      const { data: partsData } = await supabase
+        .from('participants')
+        .select('id, name, username, department')
+        .in('id', participantIds);
+
+      const partsMap: Record<string, { name: string; department: string }> = {};
+      for (const p of partsData ?? []) {
+        partsMap[p.id] = {
+          name: p.name || p.username || p.id,
+          department: p.department || '',
+        };
+      }
+
+      const entries: VoterEntry[] = votesData.map((v: any) => {
+        const p = partsMap[v.participant_id] ?? { name: v.participant_id, department: '' };
+        const ts = v.updated_at || v.created_at || '';
+        return {
+          vote_id: v.id,
+          participant_id: v.participant_id,
+          participant_name: p.name,
+          department: p.department,
+          vocal_score: v.vocal_score,
+          performance_score: v.performance_score,
+          voted_at: ts
+            ? new Date(ts).toLocaleString('vi-VN', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+              })
+            : '—',
+        };
+      });
+
+      setVoters(entries);
+    } catch (err: any) {
+      console.error('loadVoters error:', err);
+    } finally {
+      setVotersLoading(false);
+    }
+  }, [team]);
+
+  // Auto-load voters when section is opened
+  useEffect(() => {
+    if (votersOpen) loadVoters();
+  }, [votersOpen, loadVoters]);
+
+  // Delete a single vote
+  const handleDeleteVote = async (voter: VoterEntry) => {
+    if (!confirm(`Xóa phiếu chấm của "${voter.participant_name}" cho tiết mục này?`)) return;
+    setDeletingVoteId(voter.vote_id);
+    try {
+      if (isMockMode) {
+        setVoters((prev) => prev.filter((v) => v.vote_id !== voter.vote_id));
+        onUpdated();
+        return;
+      }
+      const { error } = await supabase
+        .from('votes')
+        .delete()
+        .eq('id', voter.vote_id);
+      if (error) throw error;
+      setVoters((prev) => prev.filter((v) => v.vote_id !== voter.vote_id));
+      onUpdated();
+      setSuccessMessage(`Đã xóa phiếu chấm của "${voter.participant_name}"`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setErrorMessage('Xóa phiếu thất bại: ' + (err.message || String(err)));
+    } finally {
+      setDeletingVoteId(null);
+    }
+  };
 
   if (!isOpen || !team) return null;
 
@@ -593,6 +708,107 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* 4. Danh sách khán giả đã chấm điểm */}
+          <div className="space-y-1.5 pb-2.5 border-b border-slate-200">
+            <button
+              type="button"
+              onClick={() => setVotersOpen((prev) => !prev)}
+              className="w-full flex items-center justify-between text-[11px] font-mono text-slate-600 font-semibold uppercase tracking-wider hover:text-slate-900 transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-blue-600" />
+                4. Khán Giả Đã Chấm Điểm
+                {voters.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
+                    {voters.length}
+                  </span>
+                )}
+              </span>
+              {votersOpen ? (
+                <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              )}
+            </button>
+
+            {votersOpen && (
+              <div className="mt-1.5 space-y-1">
+                {votersLoading ? (
+                  <p className="text-center text-xs font-mono text-slate-400 py-3">Đang tải...</p>
+                ) : voters.length === 0 ? (
+                  <p className="text-center text-xs font-mono text-slate-400 py-3">
+                    Chưa có khán giả nào chấm điểm tiết mục này.
+                  </p>
+                ) : (
+                  <div className="rounded border border-slate-200 overflow-hidden max-h-56 overflow-y-auto">
+                    <table className="w-full text-left text-[11px] border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-200 font-mono text-[10px] text-slate-600 uppercase">
+                          <th className="py-1.5 px-2 font-semibold">Khán Giả</th>
+                          <th className="py-1.5 px-1 text-center font-semibold w-10">Hát</th>
+                          <th className="py-1.5 px-1 text-center font-semibold w-10">KĐ</th>
+                          <th className="py-1.5 px-1 text-center font-semibold w-16">Thời Gian</th>
+                          <th className="py-1.5 px-1 w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {voters.map((voter) => (
+                          <tr
+                            key={voter.vote_id}
+                            className={`hover:bg-rose-50 transition-colors ${
+                              deletingVoteId === voter.vote_id ? 'opacity-40' : ''
+                            }`}
+                          >
+                            <td className="py-1.5 px-2">
+                              <div className="font-semibold text-slate-900 truncate max-w-[130px]">
+                                {voter.participant_name}
+                              </div>
+                              {voter.department && (
+                                <div className="text-[9px] text-slate-400 truncate max-w-[130px]">
+                                  {voter.department}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-1.5 px-1 text-center font-mono font-bold text-slate-800">
+                              {voter.vocal_score}
+                            </td>
+                            <td className="py-1.5 px-1 text-center font-mono font-bold text-slate-800">
+                              {voter.performance_score}
+                            </td>
+                            <td className="py-1.5 px-1 text-center font-mono text-[9px] text-slate-400 leading-tight">
+                              {voter.voted_at}
+                            </td>
+                            <td className="py-1.5 px-1 text-center">
+                              <button
+                                type="button"
+                                disabled={deletingVoteId === voter.vote_id}
+                                onClick={() => handleDeleteVote(voter)}
+                                title={`Xóa phiếu chấm của ${voter.participant_name}`}
+                                className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-100 transition-colors disabled:opacity-30"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={loadVoters}
+                    disabled={votersLoading}
+                    className="text-[10px] font-mono text-slate-400 hover:text-slate-700 hover:underline"
+                  >
+                    ↻ Làm mới danh sách
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}
