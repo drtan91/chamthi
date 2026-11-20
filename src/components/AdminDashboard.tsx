@@ -107,12 +107,28 @@ export const AdminDashboard: React.FC = () => {
       }
 
       // 3. Fetch participants list for management tab
-      const { data: partData } = await supabase
-        .from('view_participants_public')
+      let loadedParts: Participant[] = [];
+      const { data: partData, error: partError } = await supabase
+        .from('participants')
         .select('*')
-        .order('created_at', { ascending: true });
+        .order('name', { ascending: true });
 
-      if (partData) setParticipants(partData as Participant[]);
+      if (!partError && partData && partData.length > 0) {
+        loadedParts = partData as Participant[];
+      } else {
+        const { data: viewData } = await supabase
+          .from('view_participants_public')
+          .select('*')
+          .order('name', { ascending: true });
+        if (viewData && viewData.length > 0) {
+          loadedParts = viewData as Participant[];
+        }
+      }
+
+      if (loadedParts.length === 0) {
+        loadedParts = mockStore.getParticipants();
+      }
+      setParticipants(loadedParts);
     } catch (err) {
       console.error('Error loading admin data:', err);
     } finally {

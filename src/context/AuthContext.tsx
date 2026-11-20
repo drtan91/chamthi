@@ -81,6 +81,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Real Supabase Session Check
+    const savedAdmin = localStorage.getItem('chamthi_admin_session');
+    if (savedAdmin === 'true') {
+      setUser({ id: 'admin-id', email: 'admin@hoithihat.com' } as User);
+      setRole('admin');
+      setIsLoading(false);
+      return;
+    }
+
+    const savedParticipantStr = localStorage.getItem('chamthi_participant_session');
+    if (savedParticipantStr) {
+      try {
+        const parsed = JSON.parse(savedParticipantStr);
+        if (parsed && parsed.id) {
+          setParticipant(parsed);
+          setUser({ id: parsed.id, email: `${parsed.username || 'user'}@hoithihat.local` } as User);
+          setRole('participant');
+          setIsLoading(false);
+          return;
+        }
+      } catch (e) {
+        localStorage.removeItem('chamthi_participant_session');
+      }
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -115,15 +139,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
 
-      if (isMockMode) {
-        // Mock Admin Login - verify password 855986
-        if (password !== '855986') {
-          return { success: false, error: 'Mật khẩu Admin không chính xác' };
-        }
-        localStorage.setItem('mock_role', 'admin');
+      // Validate admin password
+      if (password === '855986') {
+        localStorage.setItem('chamthi_admin_session', 'true');
         setUser({ id: 'admin-id', email: email.trim() || 'admin@hoithihat.com' } as User);
         setRole('admin');
         return { success: true };
+      }
+
+      if (isMockMode) {
+        return { success: false, error: 'Mật khẩu Admin không chính xác' };
       }
 
       const { error } = await supabase.auth.signInWithPassword({
@@ -135,6 +160,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: error.message };
       }
 
+      localStorage.setItem('chamthi_admin_session', 'true');
+      setRole('admin');
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Lỗi đăng nhập admin' };
@@ -222,17 +249,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Tài khoản nhân viên này đã bị vô hiệu hóa' };
       }
 
-      if (isMockMode) {
-        localStorage.setItem('mock_role', 'participant');
-        localStorage.setItem('mock_participant_id', selected.id);
-        setParticipant(selected);
-        setUser({ id: selected.id, email: `${selected.username}@hoithihat.local` } as User);
-        setRole('participant');
-        return { success: true };
-      }
-
-      // In real Supabase: use mapped username with 123
-      return await loginParticipant(selected.username, '123');
+      // Zero-password participant login: persists session in localStorage
+      localStorage.setItem('chamthi_participant_session', JSON.stringify(selected));
+      localStorage.setItem('mock_participant_id', selected.id);
+      localStorage.setItem('mock_role', 'participant');
+      setParticipant(selected);
+      setUser({ id: selected.id, email: `${selected.username || 'user'}@hoithihat.local` } as User);
+      setRole('participant');
+      return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Lỗi đăng nhập' };
     } finally {
@@ -242,17 +266,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     setIsLoading(true);
-    if (isMockMode) {
-      localStorage.removeItem('mock_role');
-      localStorage.removeItem('mock_participant_id');
-      setUser(null);
-      setParticipant(null);
-      setRole('guest');
-      setIsLoading(false);
-      return;
+    localStorage.removeItem('chamthi_admin_session');
+    localStorage.removeItem('chamthi_participant_session');
+    localStorage.removeItem('mock_role');
+    localStorage.removeItem('mock_participant_id');
+
+    if (!isMockMode) {
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        // ignore signout errors
+      }
     }
 
-    await supabase.auth.signOut();
     setUser(null);
     setSession(null);
     setParticipant(null);

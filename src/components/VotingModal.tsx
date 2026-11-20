@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TeamBoardItem } from '../types';
 import { submitVote } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { X, Play, Lock, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface VotingModalProps {
@@ -18,6 +19,7 @@ export const VotingModal: React.FC<VotingModalProps> = ({
   onVoteSuccess,
   isSystemLocked,
 }) => {
+  const { participant } = useAuth();
   const [vocalScore, setVocalScore] = useState<number | ''>(20);
   const [performanceScore, setPerformanceScore] = useState<number | ''>(20);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,7 +71,7 @@ export const VotingModal: React.FC<VotingModalProps> = ({
     }
 
     setIsSubmitting(true);
-    const result = await submitVote(team.id, vScore, pScore);
+    const result = await submitVote(team.id, vScore, pScore, participant?.id);
     setIsSubmitting(false);
 
     if (result.success) {

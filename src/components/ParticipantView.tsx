@@ -48,12 +48,27 @@ export const ParticipantView: React.FC = () => {
       if (setts) setSettings(setts as SystemSettings);
 
       // 2. Fetch teams
-      const { data: teamsData } = await supabase
+      let teamsData: any[] | null = null;
+      const { data: res1, error: err1 } = await supabase
         .from('teams')
         .select('*')
         .order('performance_order', { ascending: true })
-        .order('name', { ascending: true })
-        .order('id', { ascending: true });
+        .order('name', { ascending: true });
+
+      if (!err1 && res1 && res1.length > 0) {
+        teamsData = res1;
+      } else {
+        const { data: res2 } = await supabase.from('teams').select('*');
+        if (res2 && res2.length > 0) {
+          teamsData = res2;
+        }
+      }
+
+      if (!teamsData || teamsData.length === 0) {
+        setTeams(mockStore.getTeams(participant?.id));
+        setIsLoading(false);
+        return;
+      }
 
       // 3. Fetch votes
       const { data: votesData } = await supabase
