@@ -6,10 +6,12 @@ import { useAuth } from '../context/AuthContext';
 import { TeamDetailModal } from './TeamDetailModal';
 import { ExcelImportModal } from './ExcelImportModal';
 import { AddTeamModal } from './AddTeamModal';
+import { exportVotesAsExcel } from '../lib/exportVotes';
 import {
   Lock,
   Unlock,
   FileSpreadsheet,
+  Download,
   LogOut,
   RefreshCw,
   Video,
@@ -29,6 +31,7 @@ export const AdminDashboard: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isLocking, setIsLocking] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isAddTeamModalOpen, setIsAddTeamModalOpen] = useState(false);
@@ -250,6 +253,28 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  // Export votes to Excel
+  const handleExportVotes = async () => {
+    setIsExporting(true);
+    try {
+      const { blob, filename } = await exportVotesAsExcel();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    } catch (err: any) {
+      alert('Xuất Excel thất bại: ' + (err?.message || String(err)));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const isLocked = settings?.is_locked ?? false;
 
   return (
@@ -299,6 +324,17 @@ export const AdminDashboard: React.FC = () => {
           >
             <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
             <span className="hidden sm:inline">Import</span>
+          </button>
+
+          {/* Export Votes to Excel */}
+          <button
+            onClick={handleExportVotes}
+            disabled={isExporting}
+            className="oat-btn text-xs font-mono py-1 px-2"
+            title="Xuất danh sách khán giả đã chấm điểm ra file Excel"
+          >
+            <Download className="w-3 h-3 text-blue-600" />
+            <span className="hidden sm:inline">{isExporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
           </button>
 
           {/* Refresh */}
